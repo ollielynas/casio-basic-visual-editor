@@ -12,7 +12,7 @@ enum Action {
     Move,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Code {
     Main {
         body: Vec<Code>,
@@ -32,6 +32,10 @@ enum Code {
         variable: StringVariable,
         value: StringOption,
     },
+    AssignBool {
+        variable: BoolVariable,
+        value: BoolOption,
+    },
     If {
         condition: BoolOption,
         body: Vec<Code>,
@@ -47,7 +51,7 @@ enum Code {
         value: FloatOption,
     },
 
-    End,
+    Break,
 
 }
 
@@ -231,12 +235,64 @@ impl Code {
                 });
             }
 
-            Code::AssignFloat { variable, value } => {
+            Code::AssignFloat { variable: float_variable, value } => {
                 egui::Frame::group(&egui::Style::default()).fill(Color32::from_rgb(210, 210, 230)).rounding(10.0).show(ui, |ui|  {
                     ui.horizontal(|ui| {
                         ui.label("Assign Float: ");
+                        let mut new_value:Option<FloatVariable> = None;
+                        ui.menu_button(&float_variable.name, |ui| {
+                            for (name, variable) in float_variables.iter_mut() {
+                                if ui.small_button(name).clicked() {
+                                    new_value = Some(variable.clone());
+                                }
+                            }
+                        });
+                if let Some(variable) = new_value {
+                    *float_variable = variable;
+                }
                         ui.label(" = ");
                         value.render(ui, float_variables);
+                    });
+                });
+            }
+            Code::AssignBool { variable: bool_variable, value } => {
+                egui::Frame::group(&egui::Style::default()).fill(Color32::from_rgb(210, 210, 230)).rounding(10.0).show(ui, |ui|  {
+                    ui.horizontal(|ui| {
+                        ui.label("Assign Bool: ");
+                        let mut new_value:Option<BoolVariable> = None;
+                        ui.menu_button(&bool_variable.name, |ui| {
+                            for (name, variable) in bool_variables.iter_mut() {
+                                if ui.small_button(name).clicked() {
+                                    new_value = Some(variable.clone());
+                                }
+                            }
+                        });
+                if let Some(variable) = new_value {
+                    *bool_variable = variable;
+                }
+                        ui.label(" = ");
+                        value.render(ui, string_variables, float_variables, bool_variables);
+                    });
+                });
+            }
+
+            Code::AssignString { variable: string_variable, value } => {
+                egui::Frame::group(&egui::Style::default()).fill(Color32::from_rgb(210, 210, 230)).rounding(10.0).show(ui, |ui|  {
+                    ui.horizontal(|ui| {
+                        ui.label("Assign String: ");
+                        let mut new_value:Option<StringVariable> = None;
+                        ui.menu_button(&string_variable.name, |ui| {
+                            for (name, variable) in string_variables.iter_mut() {
+                                if ui.small_button(name).clicked() {
+                                    new_value = Some(variable.clone());
+                                }
+                            }
+                        });
+                if let Some(variable) = new_value {
+                    *string_variable = variable;
+                }
+                        ui.label(" = ");
+                        value.render(ui, string_variables);
                     });
                 });
             }
@@ -253,15 +309,23 @@ impl Code {
     }
 
 
-    
+    fn output(&self) -> String {
+        return match self {
+            Code::Print { value } => format!("{}", value.output()),
+            Code::PrintFloat { value } => format!("{}", value.output()),
+
+            a => format!("'not yet added {:?}", a),
+        }
+
+    }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct MathString {
     value: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum FloatOption {
     MathString(MathString),
     Variable(FloatVariable),
@@ -331,16 +395,31 @@ impl FloatOption {
             FloatOption::Float(float) => *float,
         }
     }
+
+    fn output(&self) -> String {
+        return match self {
+            FloatOption::MathString(math_string) => math_string.value.clone(),
+            FloatOption::Variable(float_variable) => float_variable.name.clone(),
+            FloatOption::Float(float) => float.to_string(),
+        }
+    }
+
+
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct BoolVariable {
     name: String,
     value: bool,
 }
 
+impl BoolVariable {
+    fn output(&self) -> String {
+        return format!("({} = 1)", self.name);
+    }
+}
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum BoolOption {
     Variable(BoolVariable),
     StringEqual(StringOption, StringOption),
@@ -440,20 +519,49 @@ impl BoolOption {
         }
         });
     }
+
+    fn output(&self) -> String {
+        match self {
+            BoolOption::False => "(false)".to_owned(),
+            BoolOption::True => "(true)".to_owned(),
+            BoolOption::Variable(bool_variable) => format!("({}=1)", bool_variable.name),
+            BoolOption::StringEqual(a, b) => format!("({}={})", a.output(), b.output()),
+            BoolOption::Equal(a, b) => format!("({}={})", a.output(), b.output()),
+            BoolOption::NotEqual(a, b) => format!("({}<>{})", a.output(), b.output()),
+            BoolOption::Less(a, b) => format!("({}<{})", a.output(), b.output()),
+            BoolOption::LessEqual(a, b) => format!("({}<={})", a.output(), b.output()),
+            BoolOption::Greater(a, b) => format!("({}>{})", a.output(), b.output()),
+            BoolOption::GreaterEqual(a, b) => format!("({}>={})", a.output(), b.output()),
+
+        }
+    }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct FloatVariable {
     name: String,
     value: f32,
 }
 
-#[derive(Clone)]
+impl FloatVariable {
+    fn output(&self) -> String {
+        return self.name.clone();
+    }
+}
+
+#[derive(Clone, Debug)]
 struct StringVariable {
     name: String,
     value: String,
 }
 
-#[derive(Clone)]
+impl StringVariable {
+    fn output(&self) -> String {
+        return self.name.clone();
+    }
+}
+
+
+#[derive(Clone, Debug)]
 enum StringOption {
     StringConstant(String),
     StringVariable(StringVariable),
@@ -503,8 +611,15 @@ impl StringOption {
             StringOption::StringVariable(string_variable) => string_variable.value.clone(),
         }
     }
+
+    fn output(&self) -> String {
+        return format!("\"{}\"", match self {
+            StringOption::StringConstant(string) => string.clone(),
+            StringOption::StringVariable(string_variable) => string_variable.name.clone(),
+        });
+    }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Program {
     Name: String,
     Code: Vec<Code>,
@@ -523,7 +638,53 @@ impl Default for Program {
     
 }
 
-
+fn output_block( block: &Vec<Code>) -> Vec<String> {
+    let mut out = vec!["".to_owned()];
+    for (i,code) in block.iter().enumerate() {
+        match code {
+            Code::Main { body } => {
+                out.append(&mut output_block(body));
+            },
+            Code::Print { value } => {
+                out.push(value.output());
+            },
+            Code::AssignBool { variable, value } => {
+                out.push(format!("{}->{}", value.output(), variable.output()));
+            },
+            Code::AssignFloat { variable, value } => {
+                out.push(format!("{}->{}", value.output(), variable.output()));
+            },
+            Code::AssignString { variable, value } => {
+                out.push(format!("{}->{}", value.output(), variable.output()));
+            },
+            Code::If { condition, body } => {
+                out.push(format!("If {} \n Then", condition.output()));
+                out.append(&mut output_block(body));
+                out.push("End If".to_owned());
+            }
+            
+            Code::Function { name, body } => {
+                let mut function_body = vec!["".to_owned()];
+                function_body.append(&mut output_block(body));
+            }
+            Code::Break => {
+                out.push("Break".to_owned());
+            }
+            Code::PrintFloat { value } => {
+                out.push(value.output());
+            }
+            Code::While { condition, body } => {
+                out.push(format!("While {} \n Then", condition.output()));
+                out.append(&mut output_block(body));
+                out.push("End While".to_owned());
+            }
+            Code::CallFunction { name } => {
+                out.push(format!("'Call {}", name));
+            }
+        }
+    }
+    return out;
+}
 
 impl Program {
     fn from_string(string: String) -> Self {
@@ -532,12 +693,33 @@ impl Program {
         return p;
     }
 
-    fn output(&self) -> String {
-        let mut out = "".to_owned();
+    fn output(&self, string_variables: &mut HashMap<String, StringVariable>, float_variables: &mut HashMap<String, FloatVariable>, bool_variables: &mut HashMap<String, BoolVariable>) -> String {
+        let mut out = vec!["".to_owned()];
 
-        out.push_str("TODO");
+        out.push(format!("A->Dim List {}", string_variables.len()));
+        let var_string_array = string_variables.keys();
+        for (i,k) in var_string_array.enumerate() {
+            out.push(format!("'\"{}\"->List 1[{}]", string_variables.get(k).unwrap().value, i));
+        }
 
-        return out;
+        out.push(format!("B->Dim List {}", float_variables.len()));
+        let var_float_array = float_variables.keys();
+        for (i,k) in var_float_array.enumerate() {
+            out.push(format!("{}->List 2[{}]", float_variables.get(k).unwrap().value, i));
+        }
+
+        out.push(format!("C->Dim List {}", bool_variables.len()));
+        let var_bool_array = bool_variables.keys();
+        for (i,k) in var_bool_array.enumerate() {
+            out.push(format!("{}->List 3[{}]", match bool_variables.get(k).unwrap().value {
+                true => 1,
+                false => 0,
+            } , i));
+        }
+
+        out.append(&mut output_block(&self.Code));
+
+        return out.join("\n");
     }
 
     fn render(&mut self, egui_ctx: &egui::Context, drag_code: &mut Option<Code>, action: &Action, string_variables: &mut HashMap<String, StringVariable>, float_variables: &mut HashMap<String, FloatVariable>, bool_variables: &mut HashMap<String, BoolVariable>) {
@@ -690,6 +872,31 @@ async fn main() {
                 });
 
                 ui.separator();
+                let mut remove:Option<String> = None;
+                ui.label("Bool Variables:");
+                for (name, bool_variable) in bool_variables.iter_mut() {
+                    ui.horizontal(|ui| {
+                        ui.label(name);
+                        ui.checkbox(&mut bool_variable.value, "");
+                        if ui.button("X").on_hover_text("Remove Variable").clicked() {
+                            remove = Some(name.clone());
+                        }
+                    });
+                }
+                if let Some(name) = remove {
+                    bool_variables.remove(&name);
+                }
+                ui.horizontal(|ui| {
+                    ui.text_edit_singleline(&mut new_bool_variable_name);
+                    if ui.button("Add Bool Variable").clicked() {
+                        bool_variables.insert(new_bool_variable_name.clone(), BoolVariable {
+                            name: new_bool_variable_name.clone(),
+                            value: true,
+                        });
+                    }
+                });
+
+                ui.separator();
                 if action == Action::Add {
                     ui.label("Selected Code Block:");
                     add_code(ui,&mut drag_code);
@@ -698,8 +905,9 @@ async fn main() {
                 for c in [
                     Code::Print { value: StringOption::StringConstant("Hello World".to_owned()) },
                     Code::If { condition: BoolOption::True, body: vec![] },
-                    // Code::AssignFloat { variable: , value: () }
-
+                    Code::AssignBool { variable: BoolVariable { name: "Example Boolean Variable".to_owned(), value: true }, value: BoolOption::True },
+                    Code::AssignFloat { variable: FloatVariable { name: "Example Float Variable".to_owned(), value: 0.0 }, value: FloatOption::Float(1.0) },
+                    Code::AssignString { variable: StringVariable { name: "Example String Variable".to_owned(), value: "Default String".to_owned() }, value: StringOption::StringConstant("Hello World".to_owned()) },
                 ].iter_mut() {
                     let rect = ui.horizontal(|ui| {
                         c.render(ui, &mut drag_code, &Action::Edit, &mut HashMap::new(), &mut HashMap::new(), &mut HashMap::new());
@@ -714,7 +922,7 @@ async fn main() {
                 ui.horizontal(|ui| {
                     ui.label("Output");
                     if ui.button("Recompile").clicked() {
-                        compiled_text = program.output();
+                        compiled_text = program.output(&mut string_variables, &mut float_variables, &mut bool_variables);
                     }
                     if ui.button("Copy To Clipboard").clicked() {
                         egui_ctx.output_mut(|o| {
