@@ -1,8 +1,15 @@
+#![cfg_attr(
+  all(
+    target_os = "windows",
+    not(debug_assertions),
+  ),
+  windows_subsystem = "windows"
+)]
 use egui::{Color32, Ui, Response, Pos2, util::hash, Label};
 use macroquad::{prelude::*, ui};
 
 use serde::{Serialize, Deserialize};
-
+// remove console
 
 use std::{collections::HashMap, fs::{self, File}, time::Instant, io::Write};
 
@@ -331,6 +338,7 @@ enum FloatOption {
     Sin(Box<FloatOption>),
     Cos(Box<FloatOption>),
     Tan(Box<FloatOption>),
+    Mod(Box<FloatOption>, Box<FloatOption>),
     Random(Box<FloatOption>, Box<FloatOption>, bool),
     Round(Box<FloatOption>, Box<FloatOption>),
     Power(Box<FloatOption>, Box<FloatOption>),
@@ -363,9 +371,12 @@ impl FloatOption {
             FloatOption::Sin(Box::new(FloatOption::Float(1.0))),
             FloatOption::Cos(Box::new(FloatOption::Float(1.0))),
             FloatOption::Tan(Box::new(FloatOption::Float(1.0))),
+            FloatOption::Mod(Box::new(FloatOption::Float(10.0)), Box::new(FloatOption::Float(3.0))),
             FloatOption::Random(Box::new(FloatOption::Float(1.0)), Box::new(FloatOption::Float(1.0)), true),
             FloatOption::Round(Box::new(FloatOption::Float(1.0)), Box::new(FloatOption::Float(0.0))),
             FloatOption::Power(Box::new(FloatOption::Float(1.0)), Box::new(FloatOption::Float(1.0))),
+            FloatOption::CercumferenceOfCircle(Box::new(FloatOption::Float(1.0))),
+            FloatOption::EulersNumber,
             FloatOption::Pi,
             FloatOption::Tau,
             FloatOption::SquareRootOfTwo,
@@ -396,6 +407,7 @@ impl FloatOption {
             FloatOption::Round(_float, _float2) => "Round",
             FloatOption::Power(_float1, _float2) => "Power (+/- integer powers)",
             FloatOption::CercumferenceOfCircle(_float) => "Cercumference of Circle",
+            FloatOption::Mod(_1,_2) => "Mod",
             FloatOption::Pi => "Pi",
             FloatOption::Tau => "Tau",
             FloatOption::SquareRootOfTwo => "Square Root of Two",
@@ -434,6 +446,7 @@ impl FloatOption {
         _ => {}
     }
         match self {
+
             FloatOption::MathString(math_string) => {
                 ui.text_edit_singleline(&mut math_string.value);
             }
@@ -467,6 +480,11 @@ impl FloatOption {
                 float1.render(ui, float_variables);
                 ui.label("x");
                 float2.render(ui, float_variables);
+            }
+            FloatOption::Mod(n1, n2) => {
+                n1.render(ui, float_variables);
+                ui.label("%");
+                n2.render(ui, float_variables);
             }
             FloatOption::Divide(float1, float2) => {
                 
@@ -574,6 +592,7 @@ impl FloatOption {
             FloatOption::Sin(float) => format!("Sin({})", float.output()),
             FloatOption::Cos(float) => format!("Cos({})", float.output()),
             FloatOption::Tan(float) => format!("Tan({})", float.output()),
+            FloatOption::Mod(float1, float2) => format!("MOD({}, {})", float1.output(), float2.output()),
             FloatOption::Random(float1, float2, rounded) => 
             match rounded {
                 true => format!("(Int({}+(Ran#)*({}-{})+0.5))", float1.output(),float2.output(), float1.output()),
@@ -1060,10 +1079,12 @@ impl Default for Data {
     }
 }
 
-#[macroquad::main("egui with macroquad")]
+#[macroquad::main("Casio Basic Visual Editor")]
 async fn main() {
 
     let programs:HashMap<String, Program> = HashMap::new();
+
+    fs::create_dir("/some/dir");
 
     let paths = match fs::read_dir("./Programs") {
         Ok(p) => p.into_iter().collect(),
